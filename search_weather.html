@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>날씨</title>
+    <style>
+    </style>
+    <script src="jquery-1.11.1.min.js"></script>
+    <script src="jquery.xdomainajax.js"></script>
+    <script src="http://maps.google.co.kr/maps?file=api&amp;v=2&amp;key=ABQIAAAAeU8PXsv-CcInm201SSTsdBRtLhwu-T2v9jUWMzzaOm0MN4E4txR7oQsv4whFmTZ49vjxhZ64Khjzqg" type="text/javascript"></script>
+</head>
+<body>
+    <div id="content"></div>
+    <script>
+ /*
+    function getLocation(){
+        if(navigator.geolocation){
+            navigator.geolocation.getCurrentPosition(locationSuccess, locationError, geo_options);
+        }else{
+            console.log("지오 로케이션 없음")
+        }
+    };
+    // getLocation
+*/
+	
+    	var map;
+    	var geocoder;
+ 	var address;
+	/////////
+	var tmp1;
+	var tmp2;
+	/////////
+	window.onload=load;
+	window.onunload=GUnload;
+
+	function load()
+//	function initialize()
+	{
+      map = new GMap2(document.getElementById('map_canvas'));
+      map.setCenter(new GLatLng(37.566535,126.9779692), 6);
+      geocoder = new GClientGeocoder();
+      map.disableDoubleClickZoom();
+//	  map.addControl(new GNavLabelControl());     
+	  map.addControl(new GSmallMapControl());
+	  GEvent.addListener(map, "click", getAddress);
+      geocoder = new GClientGeocoder();
+    }
+
+
+// 맵정보
+    function addAddressToMap(response) {
+      map.clearOverlays();
+      if (!response || response.Status.code != 200) {
+        alert("Sorry, 주소를 확인해 주세요!!");
+      } else {
+        place = response.Placemark[0];
+        point = new GLatLng(place.Point.coordinates[1],
+                            place.Point.coordinates[0]);
+		
+	tmp1 = place.Point.coordinates[1];
+	tmp2 = place.Point.coordinates[0];
+        
+	marker = new GMarker(point);
+        map.addOverlay(marker);
+        marker.openInfoWindowHtml(
+        '<b>latitude, longitude:</b>' + place.Point.coordinates[1] + "," + place.Point.coordinates[0] + '<br>' +
+        '<b>Address :</b>' + place.address + '<br>' +
+        '<b>Country code:</b> ' + place.AddressDetails.Country.CountryNameCode);   
+		
+	//findloc();
+	}
+    }
+
+    function showLocation() {
+      var address = document.forms[0].q.value;
+      geocoder.getLocations(address, addAddressToMap);
+    }
+
+    function findLocation(address) {
+      document.forms[0].q.value = address;
+      showLocation();
+    }
+   
+    function getAddress(overlay, latlng) {
+      if (latlng != null) {
+        address = latlng;
+        geocoder.getLocations(latlng, showAddress);
+      }
+    }
+
+    function showAddress(response) {
+      map.clearOverlays();
+      if (!response || response.Status.code != 200) {
+        alert("Status Code:" + response.Status.code);
+      } else {
+        place = response.Placemark[0];
+        point = new GLatLng(place.Point.coordinates[1],
+                            place.Point.coordinates[0]);
+       
+	tmp1 = place.Point.coordinates[1];
+	tmp2 = place.Point.coordinates[0];
+
+   	marker = new GMarker(point);
+        map.addOverlay(marker);
+        marker.openInfoWindowHtml(
+       // '<b>orig latlng:</b>' + response.name + '<br/>' + 
+        '<b>latitude longitude:</b>' + place.Point.coordinates[1] + "," + place.Point.coordinates[0] + '<br>' +
+        '<b>Address:</b>' + place.address + '<br>' +
+        '<b>Country code:</b> ' + place.AddressDetails.Country.CountryNameCode);
+		
+		//////
+
+	locationSuccess(tmp1,tmp2);	
+
+      }
+    }
+
+
+
+    function locationSuccess(tmp1,tmp2){
+   //         var latitude = p.coords.latitude;
+   //         var longitude = p.coords.longitude;
+	    var latitude = tmp1;
+	    var longitude = tmp2;
+      		
+            var rs = dfs_xy_conv("toXY",latitude,longitude);
+            // 위도/경도 -> 기상청 좌표x / 좌표 y 변환
+		
+        //   alert("지금 니 위치다 \n" + "위도 : " + latitude + "\n경도 : " + longitude);        
+
+	    xml2jsonCurrentWth(rs.nx, rs.ny);
+        }
+    // locationSuccess
+
+     function locationError(error){
+            var errorTypes = {
+                0 : "무슨 에러냥~",
+                1 : "허용 안눌렀음",
+                2 : "위치가 안잡힘",
+                3 : "응답시간 지남"
+            };
+            var errorMsg = errorTypes[error.code];
+            console.log(errorMsg)
+        }
+        // locationError
+
+        var geo_options = {
+            enableHighAccuracy: true,
+            maximumAge        : 30000,
+            timeout           : 27000
+        };
+        // geo_options
+   
+
+
+
+
+
+
+ // LCC DFS 좌표변환을 위한 기초 자료
+        //
+        var RE = 6371.00877; // 지구 반경(km)
+        var GRID = 5.0; // 격자 간격(km)
+        var SLAT1 = 30.0; // 투영 위도1(degree)
+        var SLAT2 = 60.0; // 투영 위도2(degree)
+        var OLON = 126.0; // 기준점 경도(degree)
+        var OLAT = 38.0; // 기준점 위도(degree)
+        var XO = 43; // 기준점 X좌표(GRID)
+        var YO = 136; // 기1준점 Y좌표(GRID)
+        //
+        // LCC DFS 좌표변환 ( code : "toXY"(위경도->좌표, v1:위도, v2:경도), "toLL"(좌표->위경도,v1:x, v2:y) )
+        //
+    function dfs_xy_conv(code, v1, v2) {
+
+        var DEGRAD = Math.PI / 180.0;
+        var RADDEG = 180.0 / Math.PI;
+
+        var re = RE / GRID;
+        var slat1 = SLAT1 * DEGRAD;
+        var slat2 = SLAT2 * DEGRAD;
+        var olon = OLON * DEGRAD;
+        var olat = OLAT * DEGRAD;
+
+        var sn = Math.tan(Math.PI * 0.25 + slat2 * 0.5) / Math.tan(Math.PI * 0.25 + slat1 * 0.5);
+        sn = Math.log(Math.cos(slat1) / Math.cos(slat2)) / Math.log(sn);
+        var sf = Math.tan(Math.PI * 0.25 + slat1 * 0.5);
+        sf = Math.pow(sf, sn) * Math.cos(slat1) / sn;
+        var ro = Math.tan(Math.PI * 0.25 + olat * 0.5);
+        ro = re * sf / Math.pow(ro, sn);
+        var rs = {};
+        if (code == "toXY") {
+
+            rs['lat'] = v1;
+            rs['lng'] = v2;
+            var ra = Math.tan(Math.PI * 0.25 + (v1) * DEGRAD * 0.5);
+            ra = re * sf / Math.pow(ra, sn);
+            var theta = v2 * DEGRAD - olon;
+            if (theta > Math.PI) theta -= 2.0 * Math.PI;
+            if (theta < -Math.PI) theta += 2.0 * Math.PI;
+            theta *= sn;
+            rs['nx'] = Math.floor(ra * Math.sin(theta) + XO + 0.5);
+            rs['ny'] = Math.floor(ro - ra * Math.cos(theta) + YO + 0.5);
+        }
+        else {
+            rs['nx'] = v1;
+            rs['ny'] = v2;
+            var xn = v1 - XO;
+            var yn = ro - v2 + YO;
+            ra = Math.sqrt(xn * xn + yn * yn);
+            if (sn < 0.0) - ra;
+            var alat = Math.pow((re * sf / ra), (1.0 / sn));
+            alat = 2.0 * Math.atan(alat) - Math.PI * 0.5;
+
+            if (Math.abs(xn) <= 0.0) {
+                theta = 0.0;
+            }
+            else {
+                if (Math.abs(yn) <= 0.0) {
+                    theta = Math.PI * 0.5;
+                    if (xn < 0.0) - theta;
+                }
+                else theta = Math.atan2(xn, yn);
+            }
+            var alon = theta / sn + olon;
+            rs['lat'] = alat * RADDEG;
+            rs['lng'] = alon * RADDEG;
+        }
+        return rs;
+    }
+    // dfs_xy_conv
+    function xml2jsonCurrentWth(nx, ny){
+        var today = new Date();
+        var dd = today.getDate();
+        var mm = today.getMonth()+1;
+        var yyyy = today.getFullYear();
+        var hours = today.getHours();
+        var minutes = today.getMinutes();
+        console.log("time " + minutes)
+
+        if(minutes < 30){
+            // 30분보다 작으면 한시간 전 값
+            hours = hours - 1;
+            if(hours < 0){
+                // 자정 이전은 전날로 계산
+                today.setDate(today.getDate() - 1);
+                dd = today.getDate();
+                mm = today.getMonth()+1;
+                yyyy = today.getFullYear();
+                hours = 23;
+            }
+        }
+        if(hours<10) {
+            hours='0'+hours
+        }
+        if(mm<10) {
+            mm='0'+mm
+        }
+        if(dd<10) {
+            dd='0'+dd
+        } 
+
+        var _nx = nx,
+        _ny = ny,
+        apikey = "LGaHhV8%2FK%2B5N%2BAM6Sueq9XlKbvNdkkzFeT0hkk9Pt5MvQ%2BkU00E4CZedLGwek4NsU1d6Oy1nPEPYgSypohPcrw%3D%3D",
+        today = yyyy+""+mm+""+dd,
+        basetime = hours + "00",
+        fileName = "http://newsky2.kma.go.kr/service/SecndSrtpdFrcstInfoService2/ForecastGrib";
+        fileName += "?ServiceKey=" + apikey;
+        fileName += "&base_date=" + today;
+        fileName += "&base_time=" + basetime;
+        fileName += "&nx=" + _nx + "&ny=" + _ny;
+        fileName += "&pageNo=1&numOfRows=6";
+        fileName += "&_type=json";
+
+
+        $.ajax({
+        url: fileName,
+        type: 'GET',
+        cache: false,
+        success: function(data) {
+//	    alert("asdf");  pass
+	//    alert(data);
+            var myXML = rplLine(data.responseText);
+            console.log(myXML)
+            var indexS = myXML.indexOf('"body":{"items":{'),
+                indexE = myXML.indexOf("}]}"),
+                result = myXML;
+//                result = myXML.substring(indexS, indexE);
+                var jsonObj = $.parseJSON('[' + result + ']'),
+                rainsnow = jsonObj[0].response.body.items.item[0].obsrValue,
+                sky = jsonObj[0].response.body.items.item[4].obsrValue,
+		humidity = jsonObj[0].response.body.items.item[2].obsrValue,
+                temp = jsonObj[0].response.body.items.item[5].obsrValue;
+                var contentText = document.getElementById('content');
+
+		var img = document.createElement('img');
+		              
+ 
+		if(sky == 1){
+			img.src = "./1.png";
+			if(rainsnow == 0)
+				contentText.innerHTML = " 강수형태 : 없음" + " / 온도 : " + temp + " / 습도 : " + humidity;
+			if(rainsnow == 1)
+                                contentText.innerHTML = " 눈 비 상태 : 비" + " / 온도 : " + temp + " / 습도 : " + humidity;
+			if(rainsnow == 2)
+                                contentText.innerHTML = " 눈 비 상태 : 진눈개비" + " / 온도 : " + temp + " / 습도 : " + humidity;
+			if(rainsnow == 3)
+                                contentText.innerHTML = " 눈 비 상태 : 눈" + " / 온도 : " + temp + " / 습도 : " + humidity;
+
+			contentText.appendChild(img);
+		
+		}
+		else if(sky == 2){
+			 img.src = "./2.png";
+			 if(rainsnow == 0)
+                                contentText.innerHTML = " 강수형태 : 없음" + " / 온도 : " + temp + " / 습도 : " + humidity;
+                        if(rainsnow == 1)
+                                contentText.innerHTML = " 눈 비 상태 : 비" + " / 온도 : " + temp + " / 습도 : " + humidity;
+                        if(rainsnow == 2)
+                                contentText.innerHTML = " 눈 비 상태 : 진눈개비" + " / 온도 : " + temp + " / 습도 : " + humidity;
+                        if(rainsnow == 3)
+                                contentText.innerHTML = " 눈 비 상태 : 눈" + " / 온도 : " + temp + " / 습도 : " + humidity;
+
+			contentText.appendChild(img);
+
+		}
+		else if(sky == 3){
+			 img.src = "./3.png";
+			 if(rainsnow == 0)
+                                contentText.innerHTML = " 강수형태 : 없음" + " / 온도 : " + temp + " / 습도 : " + humidity;
+                        if(rainsnow == 1)
+                                contentText.innerHTML = " 눈 비 상태 : 비" + " / 온도 : " + temp + " / 습도 : " + humidity;
+                        if(rainsnow == 2)
+                                contentText.innerHTML = " 눈 비 상태 : 진눈개비" + " / 온도 : " + temp + " / 습도 : " + humidity;
+                        if(rainsnow == 3)
+                                contentText.innerHTML = " 눈 비 상태 : 눈" + " / 온도 : " + temp + " / 습도 : " + humidity;
+
+			contentText.appendChild(img);
+
+		}
+		else if(sky == 4){
+			img.src = "./4.png";
+			if(rainsnow == 0)
+                                contentText.innerHTML = " 강수형태 : 없음" + " / 온도 : " + temp + " / 습도 : " + humidity;
+                        if(rainsnow == 1)
+                                contentText.innerHTML = " 눈 비 상태 : 비" + " / 온도 : " + temp + " / 습도 : " + humidity;
+                        if(rainsnow == 2)
+                                contentText.innerHTML = " 눈 비 상태 : 진눈개비" + " / 온도 : " + temp + " / 습도 : " + humidity;
+                        if(rainsnow == 3)
+                                contentText.innerHTML = " 눈 비 상태 : 눈" + " / 온도 : " + temp + " / 습도 : " + humidity;
+
+			contentText.appendChild(img);
+		}	
+
+	},
+        error:function(request,status,error){
+            alert("다시 시도해주세요.\n" + "code:"+request.status+"\n"+"message:"+request.responseText+"\n"+"error:"+error);
+        }
+        });
+
+    }
+    // xml2jsonCurrentWth
+
+    function rplLine(value){
+        if (value != null && value != "") {
+            value = value.replace(/\n/g, "");
+            value = value.replace(/<html>/g, "");
+            value = value.replace(/<head>/g, "");
+            value = value.replace(/<head\/>/g, "");
+            value = value.replace(/<body>/g, "");
+            value = value.replace(/<\/body><\/html>/g, "");
+//            value = value.replace(/<html\/>/g, "");
+        }
+            return value;
+    }
+    // rplLine
+
+//    getLocation();
+
+    function setValue(){
+	var f = document.getElementById("addrform");
+	//var addr = place.address;
+	f.addr.value = place.address;
+	f.submit();
+    }
+
+    </script>
+
+<div id="map_canvas" style="width: 900px; height: 800px">
+<!--[if lt IE 7]>  
+<div style='border: 1px solid #F7941D; background: #FEEFDA; text-align: center; clear: both; height: 50px; 
+
+position: relative;'>  
+<div style='font-size: 12px; font-weight: bold; margin-top: 12px;'>최신 브라우저로 지금 업그레이드 
+
+해주세요.<br/> IE6 이하 버젼에서는 지원되지 않는 기능이 있습니다.
+</div>  
+</div>  
+<![endif]-->	
+</div> 
+
+<FORM id="addrform" METHOD ="POST" ACTION="http://cspro.sogang.ac.kr/~cse20111637/WeatherForecast/db_insert.php">
+<input type ="text" name="addr" value="">
+<input type="button" value="DB에 주소 전송" onClick="setValue();">
+</FORM>
+
+
+</body>
+</html>
